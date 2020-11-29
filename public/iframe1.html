@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>iframe Window</title>
+    <style>
+        body {
+            background-color: darkslategray;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Hello there, i'm an iframe</h1>
+<p>Send Message: <button id="message_button">Hi parent</button></p>
+<p id="message">Got Message:</p>
+<div id="results"> Data here</div>
+
+
+<script>
+    const button = document.getElementById('message_button');
+    const results = document.getElementById('results');
+    const message = document.getElementById('message');
+    class ClientCommunicationAPI {
+        callbacks = {};
+        constructor() {
+            this.channel = new MessageChannel();
+            this.on();
+            console.log('sending init ok');
+            // set channel between 2 ends and ports
+            window.parent.postMessage('init ok', '*', [this.channel.port2]);
+        }
+
+        setCallback(eventName, callback) {
+            this.callbacks[eventName] = callback;
+            return () => delete this.callbacks[eventName];
+    }
+
+        on() {
+            this.channel.port1.onmessage = (event) => {
+                const parsedData = JSON.parse(event.data);
+                switch (parsedData.eventType) {
+                    case 'SYSTEM_CHANGED':
+                        console.log('system changed recieved in client', parsedData.data);
+                        this.callbacks['SYSTEM_CHANGED']?.();
+                        break;
+                    default:
+                        break;
+                }
+            };
+        }
+
+        emit(eventType,data) {  // todo: change to eventType: EVENT_NAMES
+            return new Promise(async (resolve, reject) => {
+                try {
+                    this.channel.port1.postMessage(JSON.stringify({
+                        eventType,
+                        data,
+                    }));
+                    const handlerResponse = await this.incomingMessageHandler();
+                    resolve(handlerResponse);
+                } catch (err) {
+                    console.log('rejecting handler', err);
+                    reject(err);
+                }
+            });
+        }
+
+        incomingMessageHandler() {
+            return new Promise((resolve, reject) => {
+                let messageReceived = false;
+                const interval = setTimeout(() => {
+                    if (!messageReceived) {
+                        reject('no connection established');
+                    }
+                }, 2000);
+                this.channel.port1.onmessage = ({ data }) => {
+                    switch (data.status) {
+                        case 202:
+                            console.log("ack received:");
+                            messageReceived = true;
+                            clearInterval(interval);
+                            break;
+                        case 200:
+                            resolve(data);
+                            break;
+                        case 400:
+                            reject(`request failed, error: ${data.error}`);
+                            break;
+                        default:
+                            break;
+                    }
+                };
+            })
+        }
+        save(data) {
+            return this.emit('SAVE', data); // todo: change to EVENT_NAMES.SAVE
+        }
+        update(data) {
+            return this.emit('UPDATE', data); // todo: change to EVENT_NAMES.SAVE
+        }
+        onSystemChanged = (callback) => {
+            // this.setCallback('SYSTEM_CHANGED', callback);
+        }
+
+    }
+    // (
+
+    window.addEventListener("load", onLoad);
+    function onLoad() {
+        console.log("iframe loaded inside");
+        const clientCommunicationAPI = new ClientCommunicationAPI();
+        clientCommunicationAPI.onSystemChanged(() => console.log('Calling callback on Client'));
+        // Listen for button clicks
+        button.addEventListener('click', async() => {
+            try {
+                // const updateResponse = await clientCommunicationAPI.update({name: 'test1', value: 'one1'});
+                const saveResponse = await clientCommunicationAPI.save({name: 'test', value: 'one'});
+                console.log('result: ',  saveResponse);
+                // console.log('res: ',  updateResponse);
+            }   catch (err) {
+                console.log(err);
+            }
+        });
+    }
+
+
+</script>
+</body>
+</html>
