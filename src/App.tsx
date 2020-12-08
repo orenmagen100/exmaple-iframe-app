@@ -1,7 +1,7 @@
 import React from 'react';
 import './App.css';
-import {ClientCommunicationAPI} from 'wm-os-sdk-shell';
-const clientCommunicationAPI = new ClientCommunicationAPI();
+import {ClientCommunicationAPI} from "@walkme/client-shell-sdk";
+const clientCommunicationAPI = new ClientCommunicationAPI('teachMe');
 
 
 function App() {
@@ -9,7 +9,7 @@ function App() {
   clientCommunicationAPI.onSystemChanged((system: any) => {
     return new Promise( (resolve, reject) => {
       setTimeout(() => {
-        reject('ok to change system');
+        resolve('ok to change system');
       },  1000);
     });
 
